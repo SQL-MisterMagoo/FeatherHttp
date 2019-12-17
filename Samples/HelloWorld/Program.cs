@@ -17,7 +17,14 @@ class Program
 
         app.MapGet("/", async context =>
         {
+            context.Response.ContentType = "text/plain";
             await context.Response.WriteAsync("Hello World");
+        });
+
+        app.MapGet("/version", async context =>
+        {
+            context.Response.ContentType = "text/plain";
+            await context.Response.WriteAsync(Environment.Version.ToString());
         });
 
         app.MapGet("/env", async context =>
