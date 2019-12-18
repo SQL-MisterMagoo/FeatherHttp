@@ -17,6 +17,8 @@ using System.Text;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography.X509Certificates;
+using Org.BouncyCastle.X509;
 
 class RedisHub : Hub
 {
@@ -105,6 +107,10 @@ class RedisService : IAsyncDisposable
 
 class Program
 {
+    private const string ServiceAccountPath = "/var/run/secrets/kubernetes.io/serviceaccount/";
+    private const string ServiceAccountTokenKeyFileName = "token";
+    private const string ServiceAccountRootCAKeyFileName = "ca.crt";
+
     static async Task Main(string[] args)
     {
         var builder = WebApplicationHost.CreateDefaultBuilder(args);
@@ -149,10 +155,9 @@ class Program
         });
 
         var handler = new HttpClientHandler();
-        // TODO: Use /var/run/secrets/ to get the cert
-        handler.ServerCertificateCustomValidationCallback = (a, b, c, d) => true;
         var client = new HttpClient(handler);
-        var tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+        var tokenPath = Path.Combine(ServiceAccountPath, ServiceAccountTokenKeyFileName);
+        var certPath = Path.Combine(ServiceAccountPath, ServiceAccountRootCAKeyFileName);
         var token = "";
 
         var k8sHost = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST");
@@ -163,6 +168,12 @@ class Program
         {
             token = File.ReadAllText(tokenPath);
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            var certs = LoadPemFileCert(certPath);
+
+            foreach (var c in certs)
+            {
+                handler.ClientCertificates.Add(c);
+            }
         }
 
         app.MapGet("/replicas", async context =>
@@ -186,12 +197,28 @@ class Program
             {
                 deploymentName = podHostName;
             }
-            var url = $"{hostAndPort}/api/v1/namespaces/default/endpoints/{deploymentName}";
+            var url = $"{hostAndPort}/api/v1/namespaces/default/pods/{deploymentName}";
             var response = await client.GetAsync(url);
-            
+
             await (await response.Content.ReadAsStreamAsync()).CopyToAsync(context.Response.Body);
         });
 
         await app.RunAsync();
+    }
+
+    public static X509Certificate2Collection LoadPemFileCert(string file)
+    {
+        var certs = new X509CertificateParser().ReadCertificates(File.OpenRead(file));
+        var certCollection = new X509Certificate2Collection();
+
+        // Convert BouncyCastle X509Certificates to the .NET cryptography implementation and add
+        // it to the certificate collection
+        //
+        foreach (Org.BouncyCastle.X509.X509Certificate cert in certs)
+        {
+            certCollection.Add(new X509Certificate2(cert.GetEncoded()));
+        }
+
+        return certCollection;
     }
 }
