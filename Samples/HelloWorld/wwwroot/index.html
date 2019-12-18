@@ -1,0 +1,34 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+</head>
+<body>
+    <ul id="messages">
+    </ul>
+    <script src="lib/@microsoft/signalr/dist/browser/signalr.js"></script>
+    <script>
+        (async () => {
+
+            var connection = new signalR.HubConnectionBuilder()
+                .withUrl('/redis')
+                .build();
+
+            connection.on('message', message => {
+                var li = document.createElement('li');
+                li.innerText = message;
+                $('messages').appendChild(li);
+            });
+
+            function $(id) {
+                return document.getElementById(id);
+            }
+
+            await connection.start();
+
+        })();
+    </script>
+</body>
+
+</html>
