@@ -147,7 +147,9 @@ class Program
             await JsonSerializer.SerializeAsync(context.Response.Body, data);
         });
 
-        var client = new HttpClient();
+        var handler = new HttpClientHandler();
+        handler.ServerCertificateCustomValidationCallback = (a, b, c, d) => true;
+        var client = new HttpClient(handler);
 
         app.MapGet("/replicas", async context =>
         {
