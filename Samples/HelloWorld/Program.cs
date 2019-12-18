@@ -16,6 +16,7 @@ using System.IO;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http;
+using System.Net.Http.Headers;
 
 class RedisHub : Hub
 {
@@ -148,20 +149,30 @@ class Program
         });
 
         var handler = new HttpClientHandler();
+        // TODO: Use /var/run/secrets/ to get the cert
         handler.ServerCertificateCustomValidationCallback = (a, b, c, d) => true;
         var client = new HttpClient(handler);
+        var tokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token";
+        var token = "";
+
+        var k8sHost = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST");
+        var k8sPort = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_PORT");
+        var podHostName = Environment.GetEnvironmentVariable("HOSTNAME");
+
+        if (k8sHost != null)
+        {
+            token = File.ReadAllText(tokenPath);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        }
 
         app.MapGet("/replicas", async context =>
         {
             context.Response.ContentType = "application/json";
-            var k8sHost = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST");
             if (k8sHost == null)
             {
                 await JsonSerializer.SerializeAsync(context.Response.Body, new { message = "Not running in k8s" });
                 return;
             }
-            var k8sPort = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_PORT");
-            var podHostName = Environment.GetEnvironmentVariable("HOSTNAME");
             var scheme = k8sPort == "443" ? "https" : "http";
             var port = k8sPort == "443" || k8sPort == "80" ? "" : k8sPort;
             var hostAndPort = $"{scheme}://{k8sHost}:{port}";
@@ -177,17 +188,7 @@ class Program
             }
             var url = $"{hostAndPort}/api/v1/namespaces/default/endpoints/{deploymentName}";
             var response = await client.GetAsync(url);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                await JsonSerializer.SerializeAsync(context.Response.Body, new
-                {
-                    url = url,
-                    status = response.StatusCode
-                });
-                return;
-            }
-
+            
             await (await response.Content.ReadAsStreamAsync()).CopyToAsync(context.Response.Body);
         });
 
