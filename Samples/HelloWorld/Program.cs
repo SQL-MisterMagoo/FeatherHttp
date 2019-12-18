@@ -19,6 +19,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography.X509Certificates;
 using Org.BouncyCastle.X509;
+using k8s;
 
 class RedisHub : Hub
 {
@@ -154,53 +155,20 @@ class Program
             await JsonSerializer.SerializeAsync(context.Response.Body, data);
         });
 
-        var handler = new HttpClientHandler();
-        var client = new HttpClient(handler);
-        var tokenPath = Path.Combine(ServiceAccountPath, ServiceAccountTokenKeyFileName);
-        var certPath = Path.Combine(ServiceAccountPath, ServiceAccountRootCAKeyFileName);
-        var token = "";
-
-        var k8sHost = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST");
-        var k8sPort = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_PORT");
-        var podHostName = Environment.GetEnvironmentVariable("HOSTNAME");
-
-        if (k8sHost != null)
-        {
-            token = File.ReadAllText(tokenPath);
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            var certs = LoadPemFileCert(certPath);
-
-            foreach (var c in certs)
-            {
-                handler.ClientCertificates.Add(c);
-            }
-        }
-
         app.MapGet("/replicas", async context =>
         {
             context.Response.ContentType = "application/json";
-            if (k8sHost == null)
+
+            if (!KubernetesClientConfiguration.IsInCluster())
             {
                 await JsonSerializer.SerializeAsync(context.Response.Body, new { message = "Not running in k8s" });
                 return;
             }
-            var scheme = k8sPort == "443" ? "https" : "http";
-            var port = k8sPort == "443" || k8sPort == "80" ? "" : k8sPort;
-            var hostAndPort = $"{scheme}://{k8sHost}:{port}";
-            var deploymentNameIndex = podHostName.LastIndexOf('-');
-            var deploymentName = "";
-            if (deploymentNameIndex >= 0)
-            {
-                deploymentName = podHostName.Substring(0, deploymentNameIndex);
-            }
-            else
-            {
-                deploymentName = podHostName;
-            }
-            var url = $"{hostAndPort}/api/v1/namespaces/default/pods/{deploymentName}";
-            var response = await client.GetAsync(url);
 
-            await (await response.Content.ReadAsStreamAsync()).CopyToAsync(context.Response.Body);
+            var config = KubernetesClientConfiguration.InClusterConfig();
+            var kclient = new Kubernetes(config);
+            var endpoints = await kclient.ListNamespacedEndpointsAsync("helloworld");
+            await JsonSerializer.SerializeAsync(context.Response.Body, endpoints);
         });
 
         await app.RunAsync();
