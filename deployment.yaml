@@ -15,6 +15,9 @@ spec:
       containers:
         - image: davidfowl/featherweb:latest
           name: web
+          env:
+            - name: REDIS__CONNECTIONSTRING
+              value: "$(REDIS_SERVICE_HOST):$(REDIS_SERVICE_PORT)"
 ---
 apiVersion: v1
 kind: Service
