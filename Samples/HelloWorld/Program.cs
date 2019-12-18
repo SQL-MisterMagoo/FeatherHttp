@@ -132,7 +132,7 @@ class Program
 
             var data = new
             {
-                version = Environment.Version,
+                version = Environment.Version.ToString(),
                 env = vars
             };
 
