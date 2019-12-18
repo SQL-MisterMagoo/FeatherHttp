@@ -113,6 +113,8 @@ class Program
 
         var app = builder.Build();
 
+        app.UseDeveloperExceptionPage();
+
         app.UseStaticFiles();
 
         app.MapHub<RedisHub>("/redis");
