@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: helloworld-app
+  name: helloworld
 spec:
   selector:
     matchLabels:
@@ -19,7 +19,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: helloworld-service
+  name: helloworld
 spec:
   type: LoadBalancer
   ports:

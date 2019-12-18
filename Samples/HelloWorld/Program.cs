@@ -125,6 +125,9 @@ class Program
         app.MapGet("/env", async context =>
         {
             context.Response.ContentType = "application/json";
+
+            var configuration = context.RequestServices.GetRequiredService<IConfiguration>() as IConfigurationRoot;
+
             var vars = Environment.GetEnvironmentVariables()
                                   .Cast<DictionaryEntry>()
                                   .OrderBy(e => (string)e.Key)
@@ -133,7 +136,9 @@ class Program
             var data = new
             {
                 version = Environment.Version.ToString(),
-                env = vars
+                env = vars,
+                configuration = configuration.AsEnumerable().ToDictionary(c => c.Key, c => c.Value),
+                configurtionDebug =configuration.GetDebugView(),
             };
 
             await JsonSerializer.SerializeAsync(context.Response.Body, data);
