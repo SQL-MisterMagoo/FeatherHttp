@@ -15,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using System.IO;
 using System.Text;
 using Microsoft.Extensions.Configuration;
+using System.Net.Http;
 
 class RedisHub : Hub
 {
@@ -138,10 +139,52 @@ class Program
                 version = Environment.Version.ToString(),
                 env = vars,
                 configuration = configuration.AsEnumerable().ToDictionary(c => c.Key, c => c.Value),
-                configurtionDebug =configuration.GetDebugView(),
+                configurtionDebug = configuration.GetDebugView(),
             };
 
             await JsonSerializer.SerializeAsync(context.Response.Body, data);
+        });
+
+        var client = new HttpClient();
+
+        app.MapGet("/replicas", async context =>
+        {
+            context.Response.ContentType = "application/json";
+            var k8sHost = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST");
+            if (k8sHost == null)
+            {
+                await JsonSerializer.SerializeAsync(context.Response.Body, new { message = "Not running in k8s" });
+                return;
+            }
+            var k8sPort = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_PORT");
+            var podHostName = Environment.GetEnvironmentVariable("HOSTNAME");
+            var scheme = k8sPort == "443" ? "https" : "http";
+            var port = k8sPort == "443" || k8sPort == "80" ? "" : k8sPort;
+            var hostAndPort = $"{scheme}://{k8sHost}:{port}";
+            var deploymentNameIndex = podHostName.LastIndexOf('-');
+            var deploymentName = "";
+            if (deploymentNameIndex >= 0)
+            {
+                deploymentName = podHostName.Substring(0, deploymentNameIndex);
+            }
+            else
+            {
+                deploymentName = podHostName;
+            }
+            var url = $"{hostAndPort}/api/v1/namespaces/default/endpoints/{deploymentName}";
+            var response = await client.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                await JsonSerializer.SerializeAsync(context.Response.Body, new
+                {
+                    url = url,
+                    status = response.StatusCode
+                });
+                return;
+            }
+
+            await (await response.Content.ReadAsStreamAsync()).CopyToAsync(context.Response.Body);
         });
 
         await app.RunAsync();
