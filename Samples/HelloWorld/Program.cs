@@ -1,25 +1,20 @@
 ﻿using System;
 using System.Collections;
+using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using k8s;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.DependencyInjection;
-using System.Threading;
-using StackExchange.Redis;
-using Microsoft.Extensions.Logging;
-using System.IO;
-using System.Text;
 using Microsoft.Extensions.Configuration;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Security.Cryptography.X509Certificates;
-using Org.BouncyCastle.X509;
-using k8s;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
 
 class RedisHub : Hub
 {
@@ -166,27 +161,11 @@ class Program
             }
 
             var config = KubernetesClientConfiguration.InClusterConfig();
-            var kclient = new Kubernetes(config);
-            var endpoints = await kclient.ListNamespacedEndpointsAsync("helloworld");
+            var klient = new Kubernetes(config);
+            var endpoints = await klient.ListNamespacedEndpointsAsync("helloworld");
             await JsonSerializer.SerializeAsync(context.Response.Body, endpoints);
         });
 
         await app.RunAsync();
-    }
-
-    public static X509Certificate2Collection LoadPemFileCert(string file)
-    {
-        var certs = new X509CertificateParser().ReadCertificates(File.OpenRead(file));
-        var certCollection = new X509Certificate2Collection();
-
-        // Convert BouncyCastle X509Certificates to the .NET cryptography implementation and add
-        // it to the certificate collection
-        //
-        foreach (Org.BouncyCastle.X509.X509Certificate cert in certs)
-        {
-            certCollection.Add(new X509Certificate2(cert.GetEncoded()));
-        }
-
-        return certCollection;
     }
 }
