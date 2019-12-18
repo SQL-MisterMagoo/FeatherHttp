@@ -74,7 +74,7 @@ class RedisService : IAsyncDisposable
         var sub = _connection.GetSubscriber();
         await sub.SubscribeAsync("channel", async (key, value) =>
         {
-            await _context.Clients.All.SendAsync("message", value);
+            await _context.Clients.All.SendAsync("message", value.ToString());
         });
     }
 
