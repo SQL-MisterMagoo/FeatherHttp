@@ -162,8 +162,10 @@ class Program
 
             var config = KubernetesClientConfiguration.InClusterConfig();
             var klient = new Kubernetes(config);
-            var endpoints = await klient.ListNamespacedEndpointsAsync("helloworld");
-            await JsonSerializer.SerializeAsync(context.Response.Body, endpoints);
+            var endpointsList = await klient.ListNamespacedEndpointsAsync("default");
+            var ep = endpointsList.Items.First(e => e.Metadata.Name == "helloworld");
+            
+            await JsonSerializer.SerializeAsync(context.Response.Body, ep.Subsets);
         });
 
         await app.RunAsync();
