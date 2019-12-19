@@ -2,6 +2,7 @@
 using System.Collections;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -164,8 +165,16 @@ class Program
             var klient = new Kubernetes(config);
             var endpointsList = await klient.ListNamespacedEndpointsAsync("default");
             var ep = endpointsList.Items.First(e => e.Metadata.Name == "helloworld");
-            
+
             await JsonSerializer.SerializeAsync(context.Response.Body, ep.Subsets);
+        });
+
+        app.MapGet("/replicas-dns/{host}", async context =>
+        {
+            var host = (string)context.Request.RouteValues["host"];
+            var addresses = await Dns.GetHostAddressesAsync(host);
+
+            await JsonSerializer.SerializeAsync(context.Response.Body, addresses.Select(a => a.ToString()));
         });
 
         await app.RunAsync();
