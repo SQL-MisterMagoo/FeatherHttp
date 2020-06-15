@@ -1,0 +1,38 @@
+﻿@using Microsoft.AspNetCore.Components.Web
+<h3>Chat</h3>
+@if (Messages is object && Messages.Count>0)
+{
+<ul style="list-style:none;">
+    @foreach (var item in Messages.TakeLast(3))
+    {
+        <li>@(item.when.ToLocalTime().ToLongTimeString()) - @item.what</li>
+    }
+</ul>
+}
+<input contenteditable="true" @bind=@Message placeholder="Type a message" />
+<button class="btn btn-primary" @onclick=@SendMessage>Send</button>
+@code {
+    string Message;
+    static List<(DateTime when, string what)> Messages;
+    Task refresh;
+    protected override void OnInitialized()
+    {
+        refresh = Task.Factory.StartNew(async () =>
+        {
+            while(true)
+            {
+                await Task.Delay(1000);
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+    void SendMessage()
+    {
+        if (Messages is null)
+        {
+            Messages = new List<(DateTime when,string what)>();
+        }
+        Messages.Add((DateTime.UtcNow, Message));
+        Message = String.Empty;
+    }
+}

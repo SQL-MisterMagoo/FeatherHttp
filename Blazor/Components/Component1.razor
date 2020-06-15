@@ -1,0 +1,23 @@
+﻿<h1>This is a clock component</h1>
+<h2>The current time is @Time</h2>
+@code
+{
+    string Time;
+    Task showTime;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        showTime = ShowTime();
+    }
+
+    async Task ShowTime()
+    {
+        while (true)
+        {
+            Time = DateTime.Now.ToLongTimeString();
+            await InvokeAsync(StateHasChanged);
+            await Task.Delay(100);
+        }
+    }
+}
